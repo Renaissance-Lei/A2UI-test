@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>地铁网络韧性测试</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #333;
+            text-align: center;
+        }
+
+        #chat-log {
+            border: 1px solid #e0e0e0;
+            height: 400px;
+            overflow-y: scroll;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .msg {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            max-width: 85%;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .user-msg {
+            background: #e3f2fd;
+            color: #0d47a1;
+            margin-left: auto;
+            border-bottom-right-radius: 0;
+        }
+
+        .bot-msg {
+            background: #fff;
+            border: 1px solid #ddd;
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 0;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        #a2ui-container {
+            border: 2px dashed #00BFFF;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            background: #f0faff;
+        }
+
+        .multiple-choice {
+            margin-bottom: 15px;
+        }
+
+        .choice-option {
+            margin-bottom: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button {
+            padding: 10px 18px;
+            background-color: #00BFFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #009acd;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        pre {
+            background: #eee;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>地铁网络韧性测试 (A2UI)</h2>
+
+        <div id="chat-log"></div>
+
+        <div class="input-area">
+            <input type="text" id="chat-input" placeholder="例如：测试C站，5000人" value="测试C站，5000人"
+                onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">发送指令</button>
+        </div>
+    </div>
+
+    <script>
+        const chatLog = document.getElementById("chat-log");
+
+        function appendMessage(sender, text, isHtml = false) {
+            const div = document.createElement("div");
+            div.className = `msg ${sender === 'User' ? 'user-msg' : 'bot-msg'}`;
+
+            let header = `<strong>${sender === 'User' ? '用户' : 'AI 助手'}</strong><br>`;
+            if (isHtml) {
+                div.innerHTML = header + text;
+            } else {
+                div.innerHTML = header;
+                div.appendChild(document.createTextNode(text));
+            }
+
+            // Wrap user msgs to align right implicitly via flex/margins
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.appendChild(div);
+
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const inputEl = document.getElementById("chat-input");
+            const text = inputEl.value.trim();
+            if (!text) return;
+
+            appendMessage("User", text);
+            inputEl.value = "";
+
+            // Send to backend
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text })
+                });
+
+                const result = await response.json();
+
+                if (result.status === "complete") {
+                    appendMessage("Bot", `✅ 参数齐全，后台即将执行测试...<br><pre>${JSON.stringify(result.data, null, 2)}</pre>`, true);
+                    executeTask(result.data);
+                } else if (result.status === "incomplete" && result.a2ui) {
+                    appendMessage("Bot", "❌ 参数不完整，已下发A2UI动态界面让你补充相关参数。");
+                    renderA2UI(result.a2ui);
+                } else if (result.error) {
+                    appendMessage("Bot", `❌ 发生错误: ${result.error}`);
+                } else {
+                    appendMessage("Bot", `⚠️ 未知响应: <br><pre>${JSON.stringify(result, null, 2)}</pre>`, true);
+                }
+
+            } catch (err) {
+                appendMessage("Bot", `❌ 请求失败: ${err.message}`);
+            }
+        }
+
+        let currentContext = []; // Stores context bound to the button in the current A2UI payload
+
+        /**
+         * Minimal A2UI Parser
+         * It looks specifically for the surfaceUpdate containing a MultipleChoice and Button component.
+         */
+        function renderA2UI(a2uiArray) {
+            // Find the surfaceUpdate declarative object
+            const surfaceUpdateEntry = a2uiArray.find(item => item.surfaceUpdate);
+            if (!surfaceUpdateEntry) {
+                appendMessage("Bot", "❌ 未能在数据中找到 surfaceUpdate 定义。");
+                return;
+            }
+
+            const components = surfaceUpdateEntry.surfaceUpdate.components;
+
+            // Create container for the surface
+            const container = document.createElement("div");
+            container.id = "a2ui-container";
+            const primaryColor = a2uiArray.find(i => i.beginRendering)?.beginRendering.styles.primaryColor || "#00BFFF";
+            container.style.borderColor = primaryColor;
+            container.innerHTML = `<h4 style="margin-top:0; color:${primaryColor}">📌 动态参数收集面板 (A2UI)</h4>`;
+
+            // Loop through flattened components
+            components.forEach(item => {
+                const compDef = item.component;
+
+                // Render TextField
+                if (compDef.TextField) {
+                    const tfWrapper = document.createElement("div");
+                    tfWrapper.style.marginBottom = "15px";
+
+                    const labelText = compDef.TextField.label.literalString || "输入";
+                    const inputType = compDef.TextField.textFieldType === "number" ? "number" : "text";
+
+                    const labelEl = document.createElement("label");
+                    labelEl.style.display = "block";
+                    labelEl.style.marginBottom = "5px";
+                    labelEl.style.fontWeight = "bold";
+                    labelEl.style.fontSize = "14px";
+                    labelEl.textContent = labelText;
+
+                    const inputEl = document.createElement("input");
+                    inputEl.type = inputType;
+                    inputEl.id = `input-${item.id}`; // store ID for fetching value later
+                    inputEl.style.width = "100%";
+                    inputEl.style.boxSizing = "border-box";
+
+                    labelEl.appendChild(inputEl);
+                    tfWrapper.appendChild(labelEl);
+                    container.appendChild(tfWrapper);
+                }
+
+                // Render MultipleChoice (Dropdown select)
+                if (compDef.MultipleChoice) {
+                    const mcWrapper = document.createElement("div");
+                    mcWrapper.className = "multiple-choice";
+                    mcWrapper.style.marginBottom = "15px";
+
+                    // create a label if we want, or rely on select's default
+                    const labelEl = document.createElement("label");
+                    labelEl.style.display = "block";
+                    labelEl.style.marginBottom = "5px";
+                    labelEl.style.fontWeight = "bold";
+                    labelEl.style.fontSize = "14px";
+                    // If it's the station, giving it a hint
+                    if (item.id.includes("station")) {
+                        labelEl.textContent = "选择测试站点";
+                    } else if (item.id.includes("weather")) {
+                        labelEl.textContent = "选择天气状况";
+                    } else {
+                        labelEl.textContent = "请选择";
+                    }
+
+                    const selectEl = document.createElement("select");
+                    selectEl.id = `select-${item.id}`;
+                    selectEl.name = `radio-${item.id}`; // keep this name semantic for existing logic
+                    selectEl.style.width = "100%";
+                    selectEl.style.padding = "8px";
+                    selectEl.style.fontSize = "14px";
+                    selectEl.style.borderRadius = "4px";
+                    selectEl.style.border = "1px solid #ccc";
+
+                    const options = compDef.MultipleChoice.options;
+                    options.forEach((opt, idx) => {
+                        const labelText = opt.label.literalString || opt.value;
+                        const optionEl = document.createElement("option");
+                        optionEl.value = opt.value;
+                        optionEl.textContent = labelText;
+                        if (idx === 0) optionEl.selected = true; // select first by default
+                        selectEl.appendChild(optionEl);
+                    });
+
+                    mcWrapper.appendChild(labelEl);
+                    mcWrapper.appendChild(selectEl);
+                    container.appendChild(mcWrapper);
+                }
+
+                // Render Button and bind Action / Context
+                if (compDef.Button && compDef.Button.action) {
+                    currentContext = compDef.Button.action.context || [];
+
+                    const btnEl = document.createElement("button");
+                    btnEl.style.backgroundColor = primaryColor;
+
+                    // Lookup child text component by ID
+                    const childCompId = compDef.Button.child;
+                    const textComp = components.find(c => c.id === childCompId);
+                    if (textComp && textComp.component.Text) {
+                        btnEl.textContent = textComp.component.Text.text.literalString || "提交";
+                    } else {
+                        btnEl.textContent = "提交";
+                    }
+
+                    btnEl.onclick = () => submitA2UIData(btnEl);
+                    container.appendChild(btnEl);
+                }
+            });
+
+            const row = document.createElement("div");
+            row.style.display = "flex";
+
+            const div = document.createElement("div");
+            div.className = "msg bot-msg";
+            div.appendChild(container);
+
+            row.appendChild(div);
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        /**
+         * Resolves context parameters and executes the test API
+         */
+        async function submitA2UIData(btnElement) {
+            // Reconstruct Payload from Context definition
+            let payload = {};
+
+            for (let ctx of currentContext) {
+                if (ctx.value.path) {
+                    const pathStr = ctx.value.path; // e.g., "/station-input/text"
+                    const parts = pathStr.split('/');
+                    const compId = parts[1]; // component ID is right after first slash
+
+                    if (pathStr.includes("selections")) {
+                        // It's from a multiple choice (rendered as select)
+                        const selectEl = document.getElementById(`select-${compId}`);
+                        if (selectEl) {
+                            payload[ctx.key] = selectEl.value;
+                        } else {
+                            alert(`选项未能获取，可能缺失。`);
+                            return;
+                        }
+                    } else {
+                        // It's from a TextField
+                        const inputEl = document.getElementById(`input-${compId}`);
+                        if (inputEl) {
+                            if (inputEl.value.trim() === "") {
+                                alert("请将文本框填写完整！");
+                                return;
+                            }
+                            payload[ctx.key] = inputEl.type === "number" ? Number(inputEl.value) : inputEl.value;
+                        }
+                    }
+                } else if (ctx.value.literalString !== undefined) {
+                    payload[ctx.key] = ctx.value.literalString;
+                } else if (ctx.value.literalNumber !== undefined) {
+                    payload[ctx.key] = ctx.value.literalNumber;
+                }
+            }
+
+            appendMessage("User", `<em>(A2UI 表单提交) 携带合并后的参数发起调用...</em><br><pre>${JSON.stringify(payload, null, 2)}</pre>`, true);
+
+            btnElement.disabled = true; // Disable button after click
+            btnElement.textContent = "已提交";
+
+            executeTask(payload);
+        }
+
+        /**
+         * Send final filled payload to execute endpoint
+         */
+        async function executeTask(payload) {
+            try {
+                const response = await fetch("/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                let imgHtml = "";
+                if (result.image) {
+                    imgHtml = `<br><img src="${result.image}" style="max-width:100%; border-radius:8px; margin-top:10px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">`;
+                }
+
+                appendMessage("Bot", `🎉 <strong>测试执行完成</strong><br><div style="margin:10px 0; font-size:15px; line-height:1.5; background:#f9f9f9; padding:10px; border-left:4px solid #00BFFF;">${result.message}</div>${imgHtml}`, true);
+            } catch (err) {
+                appendMessage("Bot", `❌ 执行请求失败: ${err.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,30 @@
+# 环境配置与缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.env
+
+# SQLite 数据库与程序日志（避免因为测试把本地脏数据推上去）
+*.db
+*.sqlite3
+a2ui_order_system/restaurant.db
+a2ui_order_system/orders.txt
+
+# 打包构建
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+
+# IDE 与操作系统产生的无用文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
