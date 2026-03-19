@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2UI 动态点餐系统 MVP</title>
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --bg-color: #f5f5f7;
+            --chat-bg: #e9e9eb;
+            --box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--box-shadow);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .header h2 {
+            margin: 0;
+            color: #333;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 450px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fafafa;
+        }
+        .message {
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 85%;
+            word-wrap: break-word;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+        .message.user {
+            background-color: var(--primary-color);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message.agent {
+            background-color: var(--chat-bg);
+            color: black;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+        .btn-send {
+            padding: 12px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .btn-send:hover {
+            background: #006ce4;
+        }
+        
+        /* A2UI 动态生成的组件气泡样式 (Flow UI 模式) */
+        .message.ui-container {
+            background-color: transparent !important;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            animation: fadeIn 0.3s ease-in-out;
+            margin-top: 5px;
+        }
+        
+        .item-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 12px;
+            background: #fff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.06);
+            transition: transform 0.2s;
+        }
+        .item-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .item-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #222;
+        }
+        .price-tag {
+            color: #e53935;
+            font-size: 16px;
+            float: right;
+            font-weight: bold;
+        }
+        .control-group {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group label.control-label {
+            font-size: 14px;
+            color: #555;
+            width: 50px;
+            font-weight: 500;
+        }
+        .control-group input[type="number"] {
+            width: 60px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .control-group input[type="text"].remark-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .radio-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .radio-options label {
+            width: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            background: #f8f9fa;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #eee;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .radio-options label:hover {
+            background: #e9ecef;
+        }
+        .radio-options input[type="radio"]:checked + span {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        .submit-btn-wrapper {
+            text-align: center;
+            margin-top: 5px;
+        }
+        .submit-btn {
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        .submit-btn:hover {
+            background: #2ebd4f;
+        }
+        .submit-btn:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .typing-indicator {
+            color: #888;
+            font-style: italic;
+            font-size: 13px;
+            padding: 5px 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>🍽️ 智能点餐对话系统</h2>
+        <p>A2UI MVP (Flow UI Edition)</p>
+    </div>
+    
+    <div class="chat-area" id="chatArea">
+        <div class="message agent">你好！我是点餐助手。你想吃点什么？<br><br>💡 (提示：可以说“我想吃点辣的”或“有甜点吗”)</div>
+    </div>
+    
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="例如：我想吃点辣的..." onkeypress="handleEnter(event)">
+        <button class="btn-send" onclick="sendMessage()">发送</button>
+    </div>
+</div>
+
+<script>
+    const chatArea = document.getElementById('chatArea');
+    const userInput = document.getElementById('userInput');
+    
+    let currentUiConfig = null;
+
+    function appendMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+        msgDiv.innerHTML = text;
+        chatArea.appendChild(msgDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return msgDiv;
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+        
+        appendMessage(text, 'user');
+        userInput.value = '';
+        
+        const loadingMsg = appendMessage("正在思考并生成界面... <span class='typing-indicator'>...</span>", 'agent');
+        
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await response.json();
+            
+            loadingMsg.remove();
+            
+            if (data.action === 'message') {
+                appendMessage(data.message, 'agent');
+            } else if (data.action === 'render_menu') {
+                appendMessage("为您找到以下符合口味的菜品，请直接在这张卡片上操作：", 'agent');
+                renderA2UI(data);
+            }
+        } catch (error) {
+            loadingMsg.remove();
+            appendMessage(`⚠️ 请求出错: ${error.message}`, 'agent');
+        }
+    }
+
+    function renderA2UI(config) {
+        currentUiConfig = config;
+        
+        const uiBubble = document.createElement('div');
+        uiBubble.className = 'message agent ui-container';
+        
+        if (!config.ui_components) return;
+
+        // 避免渲染重复 id，打上时间戳
+        const uniquePrefix = Date.now() + "_";
+
+        config.ui_components.forEach(comp => {
+            if (comp.type === 'item_card') {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.dataset.itemId = comp.id;
+                
+                let html = `<h3 class="item-title">${comp.title} ` + 
+                           (comp.price ? `<span class="price-tag">￥${comp.price}</span>` : '') + 
+                           `</h3>`;
+                
+                if (comp.controls) {
+                    comp.controls.forEach(ctrl => {
+                        const uniqueId = uniquePrefix + ctrl.id; // 加工 id
+                        html += `<div class="control-group">`;
+                        html += `<label class="control-label">${ctrl.label || ''}</label>`;
+                        
+                        if (ctrl.type === 'number_input') {
+                            html += `<input type="number" id="${uniqueId}" min="0" value="${ctrl.default || 0}">`;
+                        } else if (ctrl.type === 'radio_group') {
+                            html += `<div class="radio-options">`;
+                            if (ctrl.options) {
+                                ctrl.options.forEach((opt, idx) => {
+                                    const checked = idx === 0 ? 'checked' : '';
+                                    html += `<label><input type="radio" name="${uniqueId}" value="${opt.value}" ${checked}> <span>${opt.label}</span></label>`;
+                                });
+                            }
+                            html += `</div>`;
+                        } else if (ctrl.type === 'text_input') {
+                            html += `<input type="text" class="remark-input" id="${uniqueId}" placeholder="${ctrl.placeholder || ''}">`;
+                        }
+                        
+                        html += `</div>`;
+                    });
+                }
+                
+                card.innerHTML = html;
+                uiBubble.appendChild(card);
+            }
+        });
+
+        if (config.submit_button) {
+            const btnWrapper = document.createElement('div');
+            btnWrapper.className = 'submit-btn-wrapper';
+            // 使用 this 传递元素，并且将 prefix 存入标签里
+            btnWrapper.innerHTML = `<button class="submit-btn" data-prefix="${uniquePrefix}" onclick="submitOrder(this)">${config.submit_button.label}</button>`;
+            uiBubble.appendChild(btnWrapper);
+        }
+        
+        chatArea.appendChild(uiBubble);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function submitOrder(btnElement) {
+        if (!currentUiConfig) return;
+        
+        const uniquePrefix = btnElement.getAttribute('data-prefix');
+        const currentBubble = btnElement.closest('.ui-container');
+        
+        // 禁用按钮防止重复点
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "提交中...";
+        btnElement.disabled = true;
+        
+        const finalData = { 
+            action: currentUiConfig.submit_button ? currentUiConfig.submit_button.action_id : 'submit_order',
+            items: [] 
+        };
+        
+        currentUiConfig.ui_components.forEach(comp => {
+            if (comp.type === 'item_card') {
+                let itemData = { 
+                    item_id: comp.id, 
+                    title: comp.title 
+                };
+                let hasQuantity = false;
+                
+                if(comp.controls) {
+                    comp.controls.forEach(ctrl => {
+                        const uniqueId = uniquePrefix + ctrl.id;
+                        if (ctrl.type === 'number_input') {
+                            const val = document.getElementById(uniqueId).value;
+                            const qty = parseInt(val, 10) || 0;
+                            itemData[ctrl.id] = qty;
+                            if (qty > 0) hasQuantity = true;
+                        } else if (ctrl.type === 'text_input') {
+                            const el = document.getElementById(uniqueId);
+                            itemData[ctrl.id] = el ? el.value : '';
+                        } else if (ctrl.type === 'radio_group') {
+                            const checked = currentBubble.querySelector(`input[name="${uniqueId}"]:checked`);
+                            itemData[ctrl.id] = checked ? checked.value : '';
+                        }
+                    });
+                }
+                
+                if (hasQuantity) {
+                    finalData.items.push(itemData);
+                }
+            }
+        });
+
+        if (finalData.items.length === 0) {
+            alert("请至少选择了一份菜品再下单哦！");
+            btnElement.innerText = originalText;
+            btnElement.disabled = false;
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/submit_order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(finalData)
+            });
+            const result = await response.json();
+            
+            // 订单成功后，把点单卡片锁定
+            const inputs = currentBubble.querySelectorAll('input');
+            inputs.forEach(i => i.disabled = true);
+            btnElement.innerText = "✅ " + originalText + " (已提交)";
+            
+            appendMessage(`✅ 系统提示: ${result.message}`, 'agent');
+            currentUiConfig = null; 
+            
+        } catch (error) {
+            alert("下单失败：" + error.message);
+            btnElement.innerText = originalText;
+            btnElement.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
