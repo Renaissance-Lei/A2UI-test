@@ -2,7 +2,7 @@
 
 请确保您的系统环境已安装 Python (建议 3.8+ 版本)。
 打开终端进入内层项目主目录，并一键安装 `requirements.txt` 清单中的所有第三方模块：
-
+两个文件夹安装的依赖基本一样，缺少根据报错补装即可
 ```bash
 cd a2ui_order_system
 pip install -r requirements.txt
@@ -13,7 +13,7 @@ pip install -r requirements.txt
 依赖安装完毕后，在使用前需要临时配置您的环境 API 密钥。在终端内顺次输入以下命令启动服务：
 
 ```cmd
-:: 1. 注入 Google AI Studio 中生成的密钥
+:: 1. 注入 Google AI Studio 中生成的密钥，（其他供应商查看其api文件更改接入方式）
 $env:GEMINI_API_KEY="YOUR_KEY"
 
 
