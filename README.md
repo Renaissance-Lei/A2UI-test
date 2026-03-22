@@ -5,6 +5,8 @@
 两个文件夹安装的依赖基本一样，缺少根据报错补装即可
 ```bash
 cd a2ui_order_system
+```
+```bash
 pip install -r requirements.txt
 ```
 
